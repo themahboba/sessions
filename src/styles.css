@@ -192,42 +192,10 @@ button {
   font-size: 0.78rem;
 }
 
-.activity-options {
+.activity-name-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(118px, 0.72fr);
   gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.activity-options legend {
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.type-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.type-pill {
-  min-height: 44px;
-  padding: 8px 10px;
-  color: #30362f;
-  background: #f4f1e8;
-  border: 1px solid #d4cebf;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 750;
-}
-
-.type-pill.selected {
-  color: #ffffff;
-  background: var(--accent);
-  border-color: var(--accent);
 }
 
 .color-picker {
@@ -499,6 +467,10 @@ button {
   gap: 10px;
 }
 
+.schedule-form .activity-name-grid {
+  grid-column: 1 / -1;
+}
+
 .weekday-options {
   grid-column: 1 / -1;
   display: grid;
@@ -569,7 +541,6 @@ button {
 }
 
 .schedule-color,
-.schedule-custom-name,
 .schedule-notes {
   grid-column: 1 / -1;
 }
@@ -1128,10 +1099,6 @@ button {
 
   .app-main {
     padding-inline: 22px;
-  }
-
-  .type-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .summary-grid {

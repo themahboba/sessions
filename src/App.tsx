@@ -15,13 +15,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 
-type ActivityType =
-  | "Gym"
-  | "Personal Training"
-  | "Handstand"
-  | "Squash"
-  | "Badminton"
-  | "Other";
+type ActivityType = string;
 
 type ExerciseEntry = {
   id: string;
@@ -65,6 +59,11 @@ type OneOffPlanItem = {
 
 type ActivityPlanItem = WeeklyPlanItem | OneOffPlanItem;
 
+type PastActivityOption = {
+  name: string;
+  activityColor?: string;
+};
+
 type TabKey = "today" | "week" | "gym" | "archive";
 
 type ArchiveWeek = {
@@ -103,23 +102,6 @@ type CalendarActivityChip =
       planItem: ActivityPlanItem;
     };
 
-const activityTypes: ActivityType[] = [
-  "Gym",
-  "Personal Training",
-  "Handstand",
-  "Squash",
-  "Badminton",
-  "Other",
-];
-
-const summaryTypes: ActivityType[] = [
-  "Gym",
-  "Squash",
-  "Badminton",
-  "Handstand",
-  "Personal Training",
-];
-
 const storageKey = "activity-tracker.logs.v1";
 const scheduleStorageKey = "activity-tracker.weekly-plan.v1";
 const oneOffPlanStorageKey = "activity-tracker.one-off-plan.v1";
@@ -143,13 +125,12 @@ const activityColorOptions = [
   { name: "Teal", value: "#14808a", soft: "#def2f3", text: "#0d626a" },
 ];
 
-const defaultActivityColors: Record<ActivityType, string> = {
+const defaultActivityColors: Record<string, string> = {
   Gym: "#1f7a55",
   "Personal Training": "#7457a6",
   Handstand: "#14808a",
   Squash: "#ad6532",
   Badminton: "#1d5e8c",
-  Other: "#b23b43",
 };
 
 const todayInputValue = () => formatDateInput(new Date());
@@ -216,15 +197,8 @@ function getWeekKey(date: Date) {
   return formatDateInput(startOfWeek(date));
 }
 
-function countByType(logs: ActivityLog[]) {
-  return activityTypes.reduce<Record<ActivityType, number>>((totals, type) => {
-    totals[type] = logs.filter((log) => log.activityType === type).length;
-    return totals;
-  }, {} as Record<ActivityType, number>);
-}
-
 function defaultActivityColor(activityType: ActivityType) {
-  return defaultActivityColors[activityType];
+  return defaultActivityColors[activityType] ?? activityColorOptions[0]!.value;
 }
 
 function resolveActivityColor(activity: { activityType: ActivityType; activityColor?: string }) {
@@ -247,18 +221,15 @@ function activityColorStyle(activity: { activityType: ActivityType; activityColo
 
 function activityDisplayName(activity: { activityType: ActivityType; customActivityName?: string }) {
   if (activity.activityType === "Other" && activity.customActivityName?.trim()) {
-    return activity.customActivityName.trim();
+    return normalizeActivityName(activity.customActivityName);
   }
-  return activity.activityType;
+  return normalizeActivityName(activity.activityType);
 }
 
 function activityShortLabel(activity: { activityType: ActivityType; customActivityName?: string }) {
-  if (activity.activityType === "Other") {
-    const displayName = activityDisplayName(activity);
-    return displayName.length > 6 ? displayName.slice(0, 6) : displayName;
-  }
+  const displayName = activityDisplayName(activity);
 
-  switch (activity.activityType) {
+  switch (displayName) {
     case "Personal Training":
       return "PT";
     case "Handstand":
@@ -266,23 +237,58 @@ function activityShortLabel(activity: { activityType: ActivityType; customActivi
     case "Badminton":
       return "Badm";
     default:
-      return activity.activityType;
+      return displayName.length > 6 ? displayName.slice(0, 6) : displayName;
   }
+}
+
+function normalizeActivityName(value = "") {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function isGymActivityName(value: string) {
+  return normalizeActivityName(value).toLowerCase() === "gym";
 }
 
 function activitiesMatch(
   first: { activityType: ActivityType; customActivityName?: string },
   second: { activityType: ActivityType; customActivityName?: string },
 ) {
-  if (first.activityType !== second.activityType) {
-    return false;
-  }
-
-  if (first.activityType !== "Other") {
-    return true;
-  }
-
   return activityDisplayName(first).toLowerCase() === activityDisplayName(second).toLowerCase();
+}
+
+function getActivityBreakdown(logs: ActivityLog[]) {
+  const counts = new Map<string, number>();
+  logs.forEach((log) => {
+    const name = activityDisplayName(log);
+    if (name) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+  });
+
+  return [...counts.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
+}
+
+function getPastActivityOptions(
+  logs: ActivityLog[],
+  schedule: WeeklyPlanItem[],
+  oneOffPlans: OneOffPlanItem[],
+) {
+  const options = new Map<string, { name: string; activityColor?: string }>();
+  const addActivity = (activity: { activityType: ActivityType; customActivityName?: string; activityColor?: string }) => {
+    const name = activityDisplayName(activity);
+    const key = name.toLowerCase();
+    if (name && !options.has(key)) {
+      options.set(key, { name, activityColor: activity.activityColor });
+    }
+  };
+
+  [...logs].reverse().forEach(addActivity);
+  schedule.forEach(addActivity);
+  oneOffPlans.forEach(addActivity);
+
+  return [...options.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function isOneOffPlanItem(item: ActivityPlanItem): item is OneOffPlanItem {
@@ -464,6 +470,10 @@ function App() {
   }, [oneOffPlans]);
 
   const sortedLogs = useMemo(() => sortLogs(logs), [logs]);
+  const pastActivityOptions = useMemo(
+    () => getPastActivityOptions(sortedLogs, schedule, oneOffPlans),
+    [oneOffPlans, schedule, sortedLogs],
+  );
   const currentWeekStart = useMemo(() => startOfWeek(new Date()), []);
   const currentWeekKey = getWeekKey(currentWeekStart);
   const currentWeekLogs = sortedLogs.filter((log) => getWeekKey(parseInputDate(log.date)) === currentWeekKey);
@@ -616,13 +626,14 @@ function App() {
       </header>
 
       <main className="app-main">
-        {activeTab === "today" && <TodayLog onSave={upsertLog} />}
+        {activeTab === "today" && <TodayLog pastActivityOptions={pastActivityOptions} onSave={upsertLog} />}
         {activeTab === "week" && (
           <WeekView
             weekStart={currentWeekStart}
             logs={currentWeekLogs}
             schedule={schedule}
             oneOffPlans={oneOffPlans}
+            pastActivityOptions={pastActivityOptions}
             onAddScheduleItem={addScheduleItem}
             onAddOneOffPlanItem={addOneOffPlanItem}
             onDeleteScheduleItem={deleteScheduleItem}
@@ -649,6 +660,7 @@ function App() {
       {editingLog ? (
         <EditSheet
           log={editingLog}
+          pastActivityOptions={pastActivityOptions}
           onSave={upsertLog}
           onDelete={deleteLog}
           onCancel={() => setEditingLog(null)}
@@ -676,7 +688,13 @@ function App() {
   );
 }
 
-function TodayLog({ onSave }: { onSave: (log: ActivityLog) => void }) {
+function TodayLog({
+  pastActivityOptions,
+  onSave,
+}: {
+  pastActivityOptions: PastActivityOption[];
+  onSave: (log: ActivityLog) => void;
+}) {
   const [resetKey, setResetKey] = useState(0);
 
   return (
@@ -684,6 +702,7 @@ function TodayLog({ onSave }: { onSave: (log: ActivityLog) => void }) {
       <LogEditor
         key={resetKey}
         mode="create"
+        pastActivityOptions={pastActivityOptions}
         onSave={(log) => {
           onSave(log);
           setResetKey((key) => key + 1);
@@ -696,18 +715,21 @@ function TodayLog({ onSave }: { onSave: (log: ActivityLog) => void }) {
 function LogEditor({
   mode,
   initialLog,
+  pastActivityOptions,
   onSave,
   onCancel,
 }: {
   mode: "create" | "edit";
   initialLog?: ActivityLog;
+  pastActivityOptions: PastActivityOption[];
   onSave: (log: ActivityLog) => void;
   onCancel?: () => void;
 }) {
+  const initialActivityName = initialLog ? activityDisplayName(initialLog) : "";
   const [date, setDate] = useState(initialLog?.date ?? todayInputValue());
-  const [activityType, setActivityType] = useState<ActivityType>(initialLog?.activityType ?? "Gym");
+  const [activityName, setActivityName] = useState(initialActivityName);
   const [activityColor, setActivityColor] = useState(
-    initialLog?.activityColor ?? defaultActivityColor(initialLog?.activityType ?? "Gym"),
+    initialLog?.activityColor ?? defaultActivityColor(initialActivityName),
   );
   const [durationMinutes, setDurationMinutes] = useState(
     initialLog?.durationMinutes ? String(initialLog.durationMinutes) : "",
@@ -717,7 +739,7 @@ function LogEditor({
     initialLog?.exercises.length ? initialLog.exercises : [makeExercise()],
   );
 
-  const isGym = activityType === "Gym";
+  const isGym = isGymActivityName(activityName);
 
   const updateExercise = (exerciseId: string, nextExercise: Partial<ExerciseEntry>) => {
     setExercises((currentExercises) =>
@@ -737,6 +759,10 @@ function LogEditor({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const cleanActivityName = normalizeActivityName(activityName);
+    if (!cleanActivityName) {
+      return;
+    }
 
     const cleanExercises = isGym
       ? exercises
@@ -751,8 +777,8 @@ function LogEditor({
     onSave({
       id: initialLog?.id ?? createId(),
       date,
-      activityType,
-      customActivityName: activityType === "Other" ? initialLog?.customActivityName : undefined,
+      activityType: cleanActivityName,
+      customActivityName: undefined,
       activityColor,
       durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
       notes: notes.trim(),
@@ -784,24 +810,15 @@ function LogEditor({
         </label>
       </div>
 
-      <fieldset className="activity-options">
-        <legend>Activity type</legend>
-        <div className="type-grid">
-          {activityTypes.map((type) => (
-            <button
-              className={activityType === type ? "type-pill selected" : "type-pill"}
-              key={type}
-              type="button"
-              onClick={() => {
-                setActivityType(type);
-                setActivityColor(defaultActivityColor(type));
-              }}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <ActivityNamePicker
+        value={activityName}
+        pastActivityOptions={pastActivityOptions}
+        onChange={setActivityName}
+        onSelectPastActivity={(activity) => {
+          setActivityName(activity.name);
+          setActivityColor(activity.activityColor ?? defaultActivityColor(activity.name));
+        }}
+      />
 
       <ColorPicker value={activityColor} onChange={setActivityColor} />
 
@@ -846,6 +863,54 @@ function LogEditor({
         </button>
       </div>
     </form>
+  );
+}
+
+function ActivityNamePicker({
+  value,
+  pastActivityOptions,
+  onChange,
+  onSelectPastActivity,
+}: {
+  value: string;
+  pastActivityOptions: PastActivityOption[];
+  onChange: (activityName: string) => void;
+  onSelectPastActivity: (activity: PastActivityOption) => void;
+}) {
+  return (
+    <div className="activity-name-grid">
+      <label className="field">
+        <span>Activity</span>
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Type activity"
+          required
+        />
+      </label>
+
+      <label className="field">
+        <span>Past activities</span>
+        <select
+          aria-label="Past activities"
+          disabled={!pastActivityOptions.length}
+          value=""
+          onChange={(event) => {
+            const activity = pastActivityOptions.find((option) => option.name === event.target.value);
+            if (activity) {
+              onSelectPastActivity(activity);
+            }
+          }}
+        >
+          <option value="">{pastActivityOptions.length ? "Choose activity" : "None yet"}</option>
+          {pastActivityOptions.map((activity) => (
+            <option key={activity.name} value={activity.name}>
+              {activity.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   );
 }
 
@@ -966,6 +1031,7 @@ function WeekView({
   logs,
   schedule,
   oneOffPlans,
+  pastActivityOptions,
   onAddScheduleItem,
   onAddOneOffPlanItem,
   onDeleteScheduleItem,
@@ -979,6 +1045,7 @@ function WeekView({
   logs: ActivityLog[];
   schedule: WeeklyPlanItem[];
   oneOffPlans: OneOffPlanItem[];
+  pastActivityOptions: PastActivityOption[];
   onAddScheduleItem: (item: WeeklyPlanItem) => void;
   onAddOneOffPlanItem: (item: OneOffPlanItem) => void;
   onDeleteScheduleItem: (itemId: string) => void;
@@ -989,7 +1056,6 @@ function WeekView({
   onDelete: (logId: string) => void;
 }) {
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  const totals = countByType(logs);
 
   return (
     <section className="stack">
@@ -1010,13 +1076,14 @@ function WeekView({
         weekStart={weekStart}
         schedule={schedule}
         oneOffPlans={oneOffPlans}
+        pastActivityOptions={pastActivityOptions}
         onAddScheduleItem={onAddScheduleItem}
         onAddOneOffPlanItem={onAddOneOffPlanItem}
         onDeleteScheduleItem={onDeleteScheduleItem}
         onDeleteOneOffPlanItem={onDeleteOneOffPlanItem}
       />
 
-      <SummaryGrid logs={logs} totals={totals} />
+      <SummaryGrid logs={logs} />
 
       <section className="day-list">
         {days.map((day, index) => {
@@ -1151,6 +1218,7 @@ function SchedulePanel({
   weekStart,
   schedule,
   oneOffPlans,
+  pastActivityOptions,
   onAddScheduleItem,
   onAddOneOffPlanItem,
   onDeleteScheduleItem,
@@ -1159,19 +1227,18 @@ function SchedulePanel({
   weekStart: Date;
   schedule: WeeklyPlanItem[];
   oneOffPlans: OneOffPlanItem[];
+  pastActivityOptions: PastActivityOption[];
   onAddScheduleItem: (item: WeeklyPlanItem) => void;
   onAddOneOffPlanItem: (item: OneOffPlanItem) => void;
   onDeleteScheduleItem: (itemId: string) => void;
   onDeleteOneOffPlanItem: (itemId: string) => void;
 }) {
-  const [activityType, setActivityType] = useState<ActivityType>("Personal Training");
-  const [customActivityName, setCustomActivityName] = useState("");
-  const [activityColor, setActivityColor] = useState(defaultActivityColor("Personal Training"));
+  const [activityName, setActivityName] = useState("");
+  const [activityColor, setActivityColor] = useState(defaultActivityColor(""));
   const [repeatsWeekly, setRepeatsWeekly] = useState(true);
   const [selectedDays, setSelectedDays] = useState<number[]>([0]);
   const [durationMinutes, setDurationMinutes] = useState("");
   const [notes, setNotes] = useState("");
-  const isOther = activityType === "Other";
   const todayWeekdayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
   const currentWeekOneOffPlans = oneOffPlans.filter(
     (item) => getWeekKey(parseInputDate(item.date)) === getWeekKey(weekStart),
@@ -1193,15 +1260,15 @@ function SchedulePanel({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const cleanCustomActivityName = customActivityName.trim();
-    if (!selectedDays.length || (isOther && !cleanCustomActivityName)) {
+    const cleanActivityName = normalizeActivityName(activityName);
+    if (!selectedDays.length || !cleanActivityName) {
       return;
     }
 
     const baseActivity = {
       id: createId(),
-      activityType,
-      customActivityName: isOther ? cleanCustomActivityName : undefined,
+      activityType: cleanActivityName,
+      customActivityName: undefined,
       activityColor,
       durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
       notes: notes.trim(),
@@ -1219,9 +1286,8 @@ function SchedulePanel({
       });
     }
 
-    setActivityType("Personal Training");
-    setCustomActivityName("");
-    setActivityColor(defaultActivityColor("Personal Training"));
+    setActivityName("");
+    setActivityColor(defaultActivityColor(""));
     setRepeatsWeekly(true);
     setSelectedDays([0]);
     setDurationMinutes("");
@@ -1235,26 +1301,15 @@ function SchedulePanel({
       </div>
 
       <form className="schedule-form" onSubmit={handleSubmit}>
-        <label className="field">
-          <span>Activity</span>
-          <select
-            value={activityType}
-            onChange={(event) => {
-              const nextType = event.target.value as ActivityType;
-              setActivityType(nextType);
-              setActivityColor(defaultActivityColor(nextType));
-              if (nextType !== "Other") {
-                setCustomActivityName("");
-              }
-            }}
-          >
-            {activityTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ActivityNamePicker
+          value={activityName}
+          pastActivityOptions={pastActivityOptions}
+          onChange={setActivityName}
+          onSelectPastActivity={(activity) => {
+            setActivityName(activity.name);
+            setActivityColor(activity.activityColor ?? defaultActivityColor(activity.name));
+          }}
+        />
 
         <label className="field">
           <span>Duration</span>
@@ -1270,18 +1325,6 @@ function SchedulePanel({
             <span>min</span>
           </div>
         </label>
-
-        {isOther ? (
-          <label className="field schedule-custom-name">
-            <span>Activity name</span>
-            <input
-              value={customActivityName}
-              onChange={(event) => setCustomActivityName(event.target.value)}
-              placeholder="e.g. Climbing"
-              required
-            />
-          </label>
-        ) : null}
 
         <label className="repeat-choice">
           <input
@@ -1325,7 +1368,7 @@ function SchedulePanel({
         <button
           className="primary-button schedule-submit"
           type="submit"
-          disabled={!selectedDays.length || (isOther && !customActivityName.trim())}
+          disabled={!selectedDays.length || !activityName.trim()}
         >
           <Plus size={17} aria-hidden="true" />
           Add activity
@@ -1376,13 +1419,10 @@ function SchedulePanel({
   );
 }
 
-function SummaryGrid({ logs, totals }: { logs: ActivityLog[]; totals: Record<ActivityType, number> }) {
+function SummaryGrid({ logs }: { logs: ActivityLog[] }) {
   const summaryItems = [
     { label: "Total", value: logs.length },
-    ...summaryTypes.map((type) => ({
-      label: type,
-      value: totals[type],
-    })),
+    ...getActivityBreakdown(logs),
   ];
 
   return (
@@ -1466,7 +1506,7 @@ function LogCard({
   onDelete: (logId: string) => void;
 }) {
   const exerciseLabel =
-    log.activityType === "Gym" && log.exercises.length
+    isGymActivityName(activityDisplayName(log)) && log.exercises.length
       ? `${log.exercises.length} ${log.exercises.length === 1 ? "exercise" : "exercises"}`
       : null;
 
@@ -1514,7 +1554,7 @@ function GymProgress({ logs, onEdit }: { logs: ActivityLog[]; onEdit: (log: Acti
     const grouped = new Map<string, { name: string; entries: Array<ExerciseEntry & { date: string; log: ActivityLog }> }>();
 
     logs.forEach((log) => {
-      if (log.activityType !== "Gym") {
+      if (!isGymActivityName(activityDisplayName(log))) {
         return;
       }
 
@@ -1665,8 +1705,7 @@ function ArchiveView({
       </div>
 
       {weeks.map((week) => {
-        const totals = countByType(week.logs);
-        const visibleBreakdown = summaryTypes.filter((type) => totals[type] > 0);
+        const visibleBreakdown = getActivityBreakdown(week.logs);
         return (
           <button className="archive-card" type="button" key={week.key} onClick={() => onSelectWeek(week)}>
             <div>
@@ -1674,9 +1713,9 @@ function ArchiveView({
               <strong>{week.logs.length} sessions</strong>
               <div className="breakdown-list">
                 {visibleBreakdown.length ? (
-                  visibleBreakdown.map((type) => (
-                    <span key={type}>
-                      {type}: {totals[type]}
+                  visibleBreakdown.map((item) => (
+                    <span key={item.label}>
+                      {item.label}: {item.value}
                     </span>
                   ))
                 ) : (
@@ -1819,11 +1858,13 @@ function ActivityDetailSheet({
 
 function EditSheet({
   log,
+  pastActivityOptions,
   onSave,
   onDelete,
   onCancel,
 }: {
   log: ActivityLog;
+  pastActivityOptions: PastActivityOption[];
   onSave: (log: ActivityLog) => void;
   onDelete: (logId: string) => void;
   onCancel: () => void;
@@ -1841,7 +1882,13 @@ function EditSheet({
           </button>
         </div>
 
-        <LogEditor mode="edit" initialLog={log} onSave={onSave} onCancel={onCancel} />
+        <LogEditor
+          mode="edit"
+          initialLog={log}
+          pastActivityOptions={pastActivityOptions}
+          onSave={onSave}
+          onCancel={onCancel}
+        />
 
         <button className="delete-wide-button" type="button" onClick={() => onDelete(log.id)}>
           <Trash2 size={17} aria-hidden="true" />
