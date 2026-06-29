@@ -638,10 +638,7 @@ function App() {
             onAddOneOffPlanItem={addOneOffPlanItem}
             onDeleteScheduleItem={deleteScheduleItem}
             onDeleteOneOffPlanItem={deleteOneOffPlanItem}
-            onLogPlannedActivity={logPlannedActivity}
             onOpenActivityDetail={setActivityDetail}
-            onEdit={handleEdit}
-            onDelete={deleteLog}
           />
         )}
         {activeTab === "gym" && <GymProgress logs={sortedLogs} onEdit={handleEdit} />}
@@ -1036,10 +1033,7 @@ function WeekView({
   onAddOneOffPlanItem,
   onDeleteScheduleItem,
   onDeleteOneOffPlanItem,
-  onLogPlannedActivity,
   onOpenActivityDetail,
-  onEdit,
-  onDelete,
 }: {
   weekStart: Date;
   logs: ActivityLog[];
@@ -1050,10 +1044,7 @@ function WeekView({
   onAddOneOffPlanItem: (item: OneOffPlanItem) => void;
   onDeleteScheduleItem: (itemId: string) => void;
   onDeleteOneOffPlanItem: (itemId: string) => void;
-  onLogPlannedActivity: (planItem: ActivityPlanItem, date: string) => void;
   onOpenActivityDetail: (detail: ActivityDetail) => void;
-  onEdit: (log: ActivityLog) => void;
-  onDelete: (logId: string) => void;
 }) {
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
 
@@ -1084,29 +1075,6 @@ function WeekView({
       />
 
       <SummaryGrid logs={logs} />
-
-      <section className="day-list">
-        {days.map((day, index) => {
-          const dateKey = formatDateInput(day);
-          const dayLogs = logs.filter((log) => log.date === dateKey);
-          const plannedItems: ActivityPlanItem[] = [
-            ...getPlansForWeekday(schedule, index),
-            ...getOneOffPlansForDate(oneOffPlans, dateKey),
-          ];
-          return (
-            <DayGroup
-              date={day}
-              key={dateKey}
-              logs={dayLogs}
-              plannedItems={plannedItems}
-              emptyLabel="No sessions"
-              onLogPlannedActivity={(planItem) => onLogPlannedActivity(planItem, dateKey)}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          );
-        })}
-      </section>
     </section>
   );
 }
