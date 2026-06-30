@@ -664,6 +664,17 @@ button {
   border-radius: 8px;
 }
 
+.schedule-row {
+  cursor: pointer;
+}
+
+.schedule-row:hover,
+.schedule-row:focus-visible {
+  border-color: var(--activity-color, var(--accent));
+  box-shadow: 0 0 0 3px var(--activity-color-soft, var(--accent-soft));
+  outline: none;
+}
+
 .schedule-row strong,
 .planned-row strong {
   display: block;
@@ -1017,6 +1028,24 @@ button {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 18px 48px rgba(23, 32, 27, 0.26);
+}
+
+.plan-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.plan-edit-type {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  border: 1px solid #cbc5b7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 900;
 }
 
 .detail-sheet {

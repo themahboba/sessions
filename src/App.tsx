@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties, FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from "react";
 
 type ActivityType = string;
 
@@ -541,6 +541,7 @@ function App() {
   const [oneOffPlans, setOneOffPlans] = useState<OneOffPlanItem[]>(getStoredOneOffPlans);
   const [activeTab, setActiveTab] = useState<TabKey>("today");
   const [editingLog, setEditingLog] = useState<ActivityLog | null>(null);
+  const [editingPlanItem, setEditingPlanItem] = useState<ActivityPlanItem | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
   const [selectedArchiveWeek, setSelectedArchiveWeek] = useState<ArchiveWeek | null>(null);
 
@@ -658,14 +659,38 @@ function App() {
     setOneOffPlans((currentPlans) => [...currentPlans, item]);
   };
 
+  const updateScheduleItem = (item: WeeklyPlanItem) => {
+    setSchedule((currentSchedule) =>
+      currentSchedule.map((currentItem) => (currentItem.id === item.id ? item : currentItem)),
+    );
+    setActivityDetail((detail) =>
+      detail?.kind === "plan" && detail.planItem.id === item.id
+        ? { kind: "plan", planItem: item, date: detail.date }
+        : detail,
+    );
+  };
+
+  const updateOneOffPlanItem = (item: OneOffPlanItem) => {
+    setOneOffPlans((currentPlans) =>
+      currentPlans.map((currentItem) => (currentItem.id === item.id ? item : currentItem)),
+    );
+    setActivityDetail((detail) =>
+      detail?.kind === "plan" && detail.planItem.id === item.id
+        ? { kind: "plan", planItem: item, date: item.date }
+        : detail,
+    );
+  };
+
   const deleteScheduleItem = (itemId: string) => {
     setSchedule((currentSchedule) => currentSchedule.filter((item) => item.id !== itemId));
     setActivityDetail((detail) => (detail?.kind === "plan" && detail.planItem.id === itemId ? null : detail));
+    setEditingPlanItem((item) => (item?.id === itemId ? null : item));
   };
 
   const deleteOneOffPlanItem = (itemId: string) => {
     setOneOffPlans((currentPlans) => currentPlans.filter((item) => item.id !== itemId));
     setActivityDetail((detail) => (detail?.kind === "plan" && detail.planItem.id === itemId ? null : detail));
+    setEditingPlanItem((item) => (item?.id === itemId ? null : item));
   };
 
   const logPlannedActivity = (planItem: ActivityPlanItem, date: string) => {
@@ -725,6 +750,7 @@ function App() {
             onAddOneOffPlanItem={addOneOffPlanItem}
             onDeleteScheduleItem={deleteScheduleItem}
             onDeleteOneOffPlanItem={deleteOneOffPlanItem}
+            onEditPlanItem={setEditingPlanItem}
             onOpenActivityDetail={setActivityDetail}
           />
         )}
@@ -751,6 +777,18 @@ function App() {
         />
       ) : null}
 
+      {editingPlanItem ? (
+        <PlanEditSheet
+          planItem={editingPlanItem}
+          pastActivityOptions={pastActivityOptions}
+          onSaveScheduleItem={updateScheduleItem}
+          onSaveOneOffPlanItem={updateOneOffPlanItem}
+          onDeleteScheduleItem={deleteScheduleItem}
+          onDeleteOneOffPlanItem={deleteOneOffPlanItem}
+          onCancel={() => setEditingPlanItem(null)}
+        />
+      ) : null}
+
       {activityDetail ? (
         <ActivityDetailSheet
           detail={activityDetail}
@@ -758,6 +796,10 @@ function App() {
           onEdit={(log) => {
             setActivityDetail(null);
             setEditingLog(log);
+          }}
+          onEditPlanActivity={(planItem) => {
+            setActivityDetail(null);
+            setEditingPlanItem(planItem);
           }}
           onLogPlannedActivity={(planItem, date) => {
             logPlannedActivity(planItem, date);
@@ -1147,6 +1189,7 @@ function WeekView({
   onAddOneOffPlanItem,
   onDeleteScheduleItem,
   onDeleteOneOffPlanItem,
+  onEditPlanItem,
   onOpenActivityDetail,
 }: {
   weekStart: Date;
@@ -1158,6 +1201,7 @@ function WeekView({
   onAddOneOffPlanItem: (item: OneOffPlanItem) => void;
   onDeleteScheduleItem: (itemId: string) => void;
   onDeleteOneOffPlanItem: (itemId: string) => void;
+  onEditPlanItem: (item: ActivityPlanItem) => void;
   onOpenActivityDetail: (detail: ActivityDetail) => void;
 }) {
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
@@ -1186,6 +1230,7 @@ function WeekView({
         onAddOneOffPlanItem={onAddOneOffPlanItem}
         onDeleteScheduleItem={onDeleteScheduleItem}
         onDeleteOneOffPlanItem={onDeleteOneOffPlanItem}
+        onEditPlanItem={onEditPlanItem}
       />
 
       <SummaryGrid logs={logs} />
@@ -1305,6 +1350,7 @@ function SchedulePanel({
   onAddOneOffPlanItem,
   onDeleteScheduleItem,
   onDeleteOneOffPlanItem,
+  onEditPlanItem,
 }: {
   weekStart: Date;
   schedule: WeeklyPlanItem[];
@@ -1314,6 +1360,7 @@ function SchedulePanel({
   onAddOneOffPlanItem: (item: OneOffPlanItem) => void;
   onDeleteScheduleItem: (itemId: string) => void;
   onDeleteOneOffPlanItem: (itemId: string) => void;
+  onEditPlanItem: (item: ActivityPlanItem) => void;
 }) {
   const [activityName, setActivityName] = useState("");
   const [activityColor, setActivityColor] = useState(defaultActivityColor(""));
@@ -1326,6 +1373,26 @@ function SchedulePanel({
     (item) => getWeekKey(parseInputDate(item.date)) === getWeekKey(weekStart),
   );
   const hasAddedActivities = schedule.length > 0 || currentWeekOneOffPlans.length > 0;
+
+  const openPlanItemEditor = (item: ActivityPlanItem) => {
+    onEditPlanItem(item);
+  };
+
+  const handlePlanRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, item: WeeklyPlanItem) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    openPlanItemEditor(item);
+  };
+
+  const handleOneOffRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, item: OneOffPlanItem) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    openPlanItemEditor(item);
+  };
 
   const toggleDay = (dayIndex: number) => {
     if (!repeatsWeekly) {
@@ -1460,7 +1527,16 @@ function SchedulePanel({
       {hasAddedActivities ? (
         <div className="schedule-list">
           {schedule.map((item) => (
-            <div className="schedule-row" key={item.id} style={activityColorStyle(item)}>
+            <div
+              aria-label={`Open ${activityDisplayName(item)} schedule`}
+              className="schedule-row"
+              key={item.id}
+              onClick={() => openPlanItemEditor(item)}
+              onKeyDown={(event) => handlePlanRowKeyDown(event, item)}
+              role="button"
+              style={activityColorStyle(item)}
+              tabIndex={0}
+            >
               <div>
                 <strong>{activityDisplayName(item)}</strong>
                 <span>{item.weekdays.map((dayIndex) => weekdays[dayIndex]?.short).join(", ")}</span>
@@ -1470,7 +1546,11 @@ function SchedulePanel({
               <button
                 className="icon-button danger"
                 type="button"
-                onClick={() => onDeleteScheduleItem(item.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteScheduleItem(item.id);
+                }}
+                onKeyDown={(event) => event.stopPropagation()}
                 aria-label={`Delete ${activityDisplayName(item)} schedule`}
               >
                 <Trash2 size={16} aria-hidden="true" />
@@ -1478,7 +1558,16 @@ function SchedulePanel({
             </div>
           ))}
           {currentWeekOneOffPlans.map((item) => (
-            <div className="schedule-row" key={item.id} style={activityColorStyle(item)}>
+            <div
+              aria-label={`Open ${activityDisplayName(item)} activity`}
+              className="schedule-row"
+              key={item.id}
+              onClick={() => openPlanItemEditor(item)}
+              onKeyDown={(event) => handleOneOffRowKeyDown(event, item)}
+              role="button"
+              style={activityColorStyle(item)}
+              tabIndex={0}
+            >
               <div>
                 <strong>{activityDisplayName(item)}</strong>
                 <span>{formatShortDate(item.date)}</span>
@@ -1488,7 +1577,11 @@ function SchedulePanel({
               <button
                 className="icon-button danger"
                 type="button"
-                onClick={() => onDeleteOneOffPlanItem(item.id)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteOneOffPlanItem(item.id);
+                }}
+                onKeyDown={(event) => event.stopPropagation()}
                 aria-label={`Delete ${activityDisplayName(item)} activity`}
               >
                 <Trash2 size={16} aria-hidden="true" />
@@ -1817,12 +1910,14 @@ function ActivityDetailSheet({
   detail,
   onClose,
   onEdit,
+  onEditPlanActivity,
   onLogPlannedActivity,
   onUpdateExerciseWeight,
 }: {
   detail: ActivityDetail;
   onClose: () => void;
   onEdit: (log: ActivityLog) => void;
+  onEditPlanActivity: (planItem: ActivityPlanItem) => void;
   onLogPlannedActivity: (planItem: ActivityPlanItem, date: string) => void;
   onUpdateExerciseWeight: (logId: string, exerciseId: string, weightKg?: number) => void;
 }) {
@@ -1927,10 +2022,16 @@ function ActivityDetailSheet({
               Edit log
             </button>
           ) : (
-            <button className="primary-button" type="button" onClick={() => onLogPlannedActivity(detail.planItem, detail.date)}>
-              <Check size={17} aria-hidden="true" />
-              Log activity
-            </button>
+            <>
+              <button className="secondary-button" type="button" onClick={() => onEditPlanActivity(detail.planItem)}>
+                <Edit3 size={17} aria-hidden="true" />
+                Edit activity
+              </button>
+              <button className="primary-button" type="button" onClick={() => onLogPlannedActivity(detail.planItem, detail.date)}>
+                <Check size={17} aria-hidden="true" />
+                Log activity
+              </button>
+            </>
           )}
         </div>
       </section>
@@ -1975,6 +2076,184 @@ function EditSheet({
         <button className="delete-wide-button" type="button" onClick={() => onDelete(log.id)}>
           <Trash2 size={17} aria-hidden="true" />
           Delete log
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function PlanEditSheet({
+  planItem,
+  pastActivityOptions,
+  onSaveScheduleItem,
+  onSaveOneOffPlanItem,
+  onDeleteScheduleItem,
+  onDeleteOneOffPlanItem,
+  onCancel,
+}: {
+  planItem: ActivityPlanItem;
+  pastActivityOptions: PastActivityOption[];
+  onSaveScheduleItem: (item: WeeklyPlanItem) => void;
+  onSaveOneOffPlanItem: (item: OneOffPlanItem) => void;
+  onDeleteScheduleItem: (itemId: string) => void;
+  onDeleteOneOffPlanItem: (itemId: string) => void;
+  onCancel: () => void;
+}) {
+  const isOneOff = isOneOffPlanItem(planItem);
+  const initialActivityName = activityDisplayName(planItem);
+  const [activityName, setActivityName] = useState(initialActivityName);
+  const [activityColor, setActivityColor] = useState(resolveActivityColor(planItem));
+  const [durationMinutes, setDurationMinutes] = useState(
+    planItem.durationMinutes ? String(planItem.durationMinutes) : "",
+  );
+  const [notes, setNotes] = useState(planItem.notes ?? "");
+  const [date, setDate] = useState(isOneOff ? planItem.date : todayInputValue());
+  const [selectedDays, setSelectedDays] = useState<number[]>(isOneOff ? [] : planItem.weekdays);
+
+  const toggleDay = (dayIndex: number) => {
+    setSelectedDays((currentDays) =>
+      currentDays.includes(dayIndex)
+        ? currentDays.filter((currentDay) => currentDay !== dayIndex)
+        : [...currentDays, dayIndex].sort((a, b) => a - b),
+    );
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const cleanActivityName = normalizeActivityName(activityName);
+    if (!cleanActivityName || (!isOneOff && !selectedDays.length) || (isOneOff && !date)) {
+      return;
+    }
+
+    const baseActivity = {
+      id: planItem.id,
+      activityType: cleanActivityName,
+      customActivityName: undefined,
+      activityColor,
+      durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
+      notes: notes.trim(),
+    };
+
+    if (isOneOff) {
+      onSaveOneOffPlanItem({
+        ...baseActivity,
+        date,
+      });
+    } else {
+      onSaveScheduleItem({
+        ...baseActivity,
+        weekdays: selectedDays,
+      });
+    }
+
+    onCancel();
+  };
+
+  const handleDelete = () => {
+    if (isOneOff) {
+      onDeleteOneOffPlanItem(planItem.id);
+    } else {
+      onDeleteScheduleItem(planItem.id);
+    }
+    onCancel();
+  };
+
+  return (
+    <div className="sheet-backdrop" role="presentation">
+      <section className="edit-sheet" role="dialog" aria-modal="true" aria-labelledby="edit-plan-title">
+        <div className="sheet-header">
+          <div>
+            <p className="eyebrow">{isOneOff ? "Edit activity" : "Edit repeating activity"}</p>
+            <h2 id="edit-plan-title">{initialActivityName}</h2>
+          </div>
+          <button className="icon-button ghost" type="button" onClick={onCancel} aria-label="Close editor">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <form className="plan-edit-form" onSubmit={handleSubmit}>
+          <ActivityNamePicker
+            value={activityName}
+            pastActivityOptions={pastActivityOptions}
+            onChange={setActivityName}
+            onSelectPastActivity={(activity) => {
+              setActivityName(activity.name);
+              setActivityColor(activity.activityColor ?? defaultActivityColor(activity.name));
+            }}
+          />
+
+          <div className="form-grid">
+            {isOneOff ? (
+              <label className="field">
+                <span>Date</span>
+                <input value={date} onChange={(event) => setDate(event.target.value)} type="date" required />
+              </label>
+            ) : (
+              <div className="plan-edit-type">
+                <span>Repeats weekly</span>
+              </div>
+            )}
+
+            <label className="field">
+              <span>Duration</span>
+              <div className="input-with-unit">
+                <input
+                  min="0"
+                  inputMode="numeric"
+                  value={durationMinutes}
+                  onChange={(event) => setDurationMinutes(event.target.value)}
+                  type="number"
+                  placeholder="Optional"
+                />
+                <span>min</span>
+              </div>
+            </label>
+          </div>
+
+          <ColorPicker value={activityColor} onChange={setActivityColor} />
+
+          {!isOneOff ? (
+            <fieldset className="weekday-options">
+              <legend>Days</legend>
+              <div className="weekday-grid">
+                {weekdays.map((day, index) => (
+                  <button
+                    className={selectedDays.includes(index) ? "weekday-toggle selected" : "weekday-toggle"}
+                    key={day.short}
+                    type="button"
+                    onClick={() => toggleDay(index)}
+                  >
+                    <span>{day.short}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
+
+          <label className="field">
+            <span>Notes</span>
+            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} placeholder="Optional" />
+          </label>
+
+          <div className="action-row">
+            <button className="secondary-button" type="button" onClick={onCancel}>
+              <X size={17} aria-hidden="true" />
+              Cancel
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!activityName.trim() || (!isOneOff && !selectedDays.length)}
+            >
+              <Check size={17} aria-hidden="true" />
+              Save changes
+            </button>
+          </div>
+        </form>
+
+        <button className="delete-wide-button" type="button" onClick={handleDelete}>
+          <Trash2 size={17} aria-hidden="true" />
+          Delete activity
         </button>
       </section>
     </div>
