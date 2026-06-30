@@ -898,6 +898,15 @@ function LogEditor({
   );
 
   const isGym = isGymActivityName(activityName);
+  const [isExerciseSectionOpen, setIsExerciseSectionOpen] = useState(
+    isGymActivityName(initialActivityName) || Boolean(initialLog?.exercises.length),
+  );
+
+  useEffect(() => {
+    if (isGym) {
+      setIsExerciseSectionOpen(true);
+    }
+  }, [isGym]);
 
   const updateExercise = (exerciseId: string, nextExercise: Partial<ExerciseEntry>) => {
     setExercises((currentExercises) =>
@@ -922,7 +931,7 @@ function LogEditor({
       return;
     }
 
-    const cleanExercises = isGym
+    const cleanExercises = isExerciseSectionOpen
       ? exercises
           .filter((exercise) => exercise.exerciseName.trim())
           .map((exercise) => ({
@@ -980,7 +989,7 @@ function LogEditor({
 
       <ColorPicker value={activityColor} onChange={setActivityColor} />
 
-      {isGym ? (
+      {isExerciseSectionOpen ? (
         <section className="exercise-stack">
           <div className="section-heading">
             <h2>Exercises</h2>
@@ -1001,7 +1010,12 @@ function LogEditor({
             />
           ))}
         </section>
-      ) : null}
+      ) : (
+        <button className="icon-text-button exercise-toggle-button" type="button" onClick={() => setIsExerciseSectionOpen(true)}>
+          <Plus size={17} aria-hidden="true" />
+          Add exercise?
+        </button>
+      )}
 
       <label className="field">
         <span>Notes</span>
@@ -1712,10 +1726,9 @@ function LogCard({
   onEdit: (log: ActivityLog) => void;
   onDelete: (logId: string) => void;
 }) {
-  const exerciseLabel =
-    isGymActivityName(activityDisplayName(log)) && log.exercises.length
-      ? `${log.exercises.length} ${log.exercises.length === 1 ? "exercise" : "exercises"}`
-      : null;
+  const exerciseLabel = log.exercises.length
+    ? `${log.exercises.length} ${log.exercises.length === 1 ? "exercise" : "exercises"}`
+    : null;
 
   return (
     <article className="log-card" style={activityColorStyle(log)}>
