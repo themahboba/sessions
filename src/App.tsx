@@ -13,7 +13,7 @@ import {
   Trophy,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from "react";
 
 type ActivityType = string;
@@ -544,6 +544,8 @@ function App() {
   const [editingPlanItem, setEditingPlanItem] = useState<ActivityPlanItem | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
   const [selectedArchiveWeek, setSelectedArchiveWeek] = useState<ArchiveWeek | null>(null);
+  const lockedScrollTop = useRef(0);
+  const isPopupOpen = Boolean(editingLog || editingPlanItem || activityDetail);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(logs));
@@ -556,6 +558,36 @@ function App() {
   useEffect(() => {
     localStorage.setItem(oneOffPlanStorageKey, JSON.stringify(oneOffPlans));
   }, [oneOffPlans]);
+
+  useEffect(() => {
+    if (!isPopupOpen) {
+      return;
+    }
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyPosition = body.style.position;
+    const previousBodyTop = body.style.top;
+    const previousBodyWidth = body.style.width;
+    const previousBodyOverflow = body.style.overflow;
+
+    lockedScrollTop.current = window.scrollY;
+    html.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${lockedScrollTop.current}px`;
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.position = previousBodyPosition;
+      body.style.top = previousBodyTop;
+      body.style.width = previousBodyWidth;
+      body.style.overflow = previousBodyOverflow;
+      window.scrollTo(0, lockedScrollTop.current);
+    };
+  }, [isPopupOpen]);
 
   const sortedLogs = useMemo(() => sortLogs(logs), [logs]);
   const pastActivityOptions = useMemo(

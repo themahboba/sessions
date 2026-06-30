@@ -1027,12 +1027,16 @@ button {
   justify-content: center;
   padding: 14px;
   background: rgba(23, 32, 27, 0.42);
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .edit-sheet {
   width: min(100%, 720px);
   max-height: min(88vh, 920px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   display: grid;
   gap: 12px;
   padding: 14px;
