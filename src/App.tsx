@@ -2109,6 +2109,7 @@ function PlanEditSheet({
   const [notes, setNotes] = useState(planItem.notes ?? "");
   const [date, setDate] = useState(isOneOff ? planItem.date : todayInputValue());
   const [selectedDays, setSelectedDays] = useState<number[]>(isOneOff ? [] : planItem.weekdays);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const toggleDay = (dayIndex: number) => {
     setSelectedDays((currentDays) =>
@@ -2172,63 +2173,79 @@ function PlanEditSheet({
         </div>
 
         <form className="plan-edit-form" onSubmit={handleSubmit}>
-          <ActivityNamePicker
-            value={activityName}
-            pastActivityOptions={pastActivityOptions}
-            onChange={setActivityName}
-            onSelectPastActivity={(activity) => {
-              setActivityName(activity.name);
-              setActivityColor(activity.activityColor ?? defaultActivityColor(activity.name));
-            }}
-          />
+          <section className="collapsible-section">
+            <button
+              aria-expanded={isDetailsOpen}
+              className="collapsible-trigger"
+              type="button"
+              onClick={() => setIsDetailsOpen((current) => !current)}
+            >
+              <span>Edit activity details</span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </button>
 
-          <div className="form-grid">
-            {isOneOff ? (
-              <label className="field">
-                <span>Date</span>
-                <input value={date} onChange={(event) => setDate(event.target.value)} type="date" required />
-              </label>
-            ) : (
-              <div className="plan-edit-type">
-                <span>Repeats weekly</span>
-              </div>
-            )}
-
-            <label className="field">
-              <span>Duration</span>
-              <div className="input-with-unit">
-                <input
-                  min="0"
-                  inputMode="numeric"
-                  value={durationMinutes}
-                  onChange={(event) => setDurationMinutes(event.target.value)}
-                  type="number"
-                  placeholder="Optional"
+            {isDetailsOpen ? (
+              <div className="collapsible-content">
+                <ActivityNamePicker
+                  value={activityName}
+                  pastActivityOptions={pastActivityOptions}
+                  onChange={setActivityName}
+                  onSelectPastActivity={(activity) => {
+                    setActivityName(activity.name);
+                    setActivityColor(activity.activityColor ?? defaultActivityColor(activity.name));
+                  }}
                 />
-                <span>min</span>
-              </div>
-            </label>
-          </div>
 
-          <ColorPicker value={activityColor} onChange={setActivityColor} />
+                <div className="form-grid">
+                  {isOneOff ? (
+                    <label className="field">
+                      <span>Date</span>
+                      <input value={date} onChange={(event) => setDate(event.target.value)} type="date" required />
+                    </label>
+                  ) : (
+                    <div className="plan-edit-type">
+                      <span>Repeats weekly</span>
+                    </div>
+                  )}
 
-          {!isOneOff ? (
-            <fieldset className="weekday-options">
-              <legend>Days</legend>
-              <div className="weekday-grid">
-                {weekdays.map((day, index) => (
-                  <button
-                    className={selectedDays.includes(index) ? "weekday-toggle selected" : "weekday-toggle"}
-                    key={day.short}
-                    type="button"
-                    onClick={() => toggleDay(index)}
-                  >
-                    <span>{day.short}</span>
-                  </button>
-                ))}
+                  <label className="field">
+                    <span>Duration</span>
+                    <div className="input-with-unit">
+                      <input
+                        min="0"
+                        inputMode="numeric"
+                        value={durationMinutes}
+                        onChange={(event) => setDurationMinutes(event.target.value)}
+                        type="number"
+                        placeholder="Optional"
+                      />
+                      <span>min</span>
+                    </div>
+                  </label>
+                </div>
+
+                <ColorPicker value={activityColor} onChange={setActivityColor} />
+
+                {!isOneOff ? (
+                  <fieldset className="weekday-options">
+                    <legend>Days</legend>
+                    <div className="weekday-grid">
+                      {weekdays.map((day, index) => (
+                        <button
+                          className={selectedDays.includes(index) ? "weekday-toggle selected" : "weekday-toggle"}
+                          key={day.short}
+                          type="button"
+                          onClick={() => toggleDay(index)}
+                        >
+                          <span>{day.short}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
               </div>
-            </fieldset>
-          ) : null}
+            ) : null}
+          </section>
 
           <label className="field">
             <span>Notes</span>

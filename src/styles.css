@@ -1047,6 +1047,47 @@ button {
   gap: 12px;
 }
 
+.collapsible-section {
+  display: grid;
+  gap: 10px;
+}
+
+.collapsible-trigger {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 950;
+  text-align: left;
+}
+
+.collapsible-trigger svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 160ms ease;
+}
+
+.collapsible-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.collapsible-content {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
 .plan-edit-type {
   min-height: 46px;
   display: flex;
