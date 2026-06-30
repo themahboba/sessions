@@ -1393,7 +1393,7 @@ function SchedulePanel({
           }}
         />
 
-        <label className="field">
+        <label className="field schedule-duration">
           <span>Duration</span>
           <div className="input-with-unit">
             <input
