@@ -2,6 +2,7 @@ import {
   Archive,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Dumbbell,
@@ -116,14 +117,84 @@ const weekdays = [
   { short: "Sun", long: "Sunday" },
 ];
 
-const activityColorOptions = [
+type ActivityColorOption = {
+  name: string;
+  value: string;
+  soft?: string;
+  text?: string;
+};
+
+const activityColorOptions: ActivityColorOption[] = [
+  { name: "Black", value: "#000000" },
+  { name: "Charcoal", value: "#444444" },
+  { name: "Grey", value: "#666666" },
+  { name: "Silver", value: "#999999" },
+  { name: "Light grey", value: "#b7b7b7" },
+  { name: "Pale grey", value: "#cccccc" },
+  { name: "Soft grey", value: "#dddddd" },
+  { name: "Mist", value: "#eeeeee" },
+  { name: "White", value: "#ffffff" },
+  { name: "Deep red", value: "#990000" },
+  { name: "Red", value: "#b23b43" },
+  { name: "Orange", value: "#ff9900" },
+  { name: "Yellow", value: "#ffff00" },
+  { name: "Lime", value: "#00ff00" },
+  { name: "Cyan", value: "#00ffff" },
+  { name: "Sky blue", value: "#4a86e8" },
+  { name: "Blue", value: "#0000ff" },
+  { name: "Violet", value: "#9900ff" },
+  { name: "Magenta", value: "#ff00ff" },
+  { name: "Blush", value: "#ead1dc" },
+  { name: "Light coral", value: "#f4cccc" },
+  { name: "Peach", value: "#fce5cd" },
+  { name: "Cream", value: "#fff2cc" },
+  { name: "Mint", value: "#d9ead3" },
+  { name: "Pale teal", value: "#d0e0e3" },
+  { name: "Pale blue", value: "#cfe2f3" },
+  { name: "Lavender", value: "#d9d2e9" },
+  { name: "Salmon", value: "#e06666" },
+  { name: "Apricot", value: "#f6b26b" },
+  { name: "Light gold", value: "#ffd966" },
+  { name: "Sage", value: "#93c47d" },
+  { name: "Slate teal", value: "#76a5af" },
+  { name: "Cornflower", value: "#6d9eeb" },
+  { name: "Periwinkle", value: "#8e7cc3" },
+  { name: "Mauve", value: "#c27ba0" },
+  { name: "Tomato", value: "#cc4125" },
+  { name: "Crimson", value: "#cc0000" },
+  { name: "Tangerine", value: "#e69138" },
+  { name: "Amber", value: "#f1c232" },
   { name: "Green", value: "#1f7a55", soft: "#e1f1e8", text: "#135e3f" },
-  { name: "Blue", value: "#1d5e8c", soft: "#e7f0f7", text: "#16496e" },
-  { name: "Orange", value: "#ad6532", soft: "#f5e8dc", text: "#8f4e23" },
-  { name: "Red", value: "#b23b43", soft: "#fae7e9", text: "#8f2d34" },
+  { name: "Steel teal", value: "#45818e" },
+  { name: "Royal blue", value: "#3c78d8" },
+  { name: "Medium blue", value: "#3d85c6" },
   { name: "Purple", value: "#7457a6", soft: "#eee9f6", text: "#584080" },
+  { name: "Berry", value: "#a64d79" },
+  { name: "Brick", value: "#85200c" },
+  { name: "Burnt orange", value: "#b45f06" },
+  { name: "Mustard", value: "#bf9000" },
+  { name: "Forest", value: "#38761d" },
+  { name: "Deep teal", value: "#134f5c" },
+  { name: "Navy", value: "#1155cc" },
+  { name: "Ocean", value: "#0b5394" },
+  { name: "Indigo", value: "#351c75" },
+  { name: "Plum", value: "#741b47" },
+  { name: "Espresso", value: "#5b0f00" },
+  { name: "Maroon", value: "#660000" },
+  { name: "Brown", value: "#783f04" },
+  { name: "Olive", value: "#7f6000" },
+  { name: "Moss", value: "#274e13" },
+  { name: "Ink teal", value: "#0c343d" },
+  { name: "Dark navy", value: "#1c4587" },
+  { name: "Midnight", value: "#073763" },
+  { name: "Deep purple", value: "#20124d" },
+  { name: "Wine", value: "#4c1130" },
   { name: "Teal", value: "#14808a", soft: "#def2f3", text: "#0d626a" },
+  { name: "Squash orange", value: "#ad6532", soft: "#f5e8dc", text: "#8f4e23" },
+  { name: "Badminton blue", value: "#1d5e8c", soft: "#e7f0f7", text: "#16496e" },
 ];
+
+const fallbackActivityColor = "#1f7a55";
 
 const defaultActivityColors: Record<string, string> = {
   Gym: "#1f7a55",
@@ -198,24 +269,40 @@ function getWeekKey(date: Date) {
 }
 
 function defaultActivityColor(activityType: ActivityType) {
-  return defaultActivityColors[activityType] ?? activityColorOptions[0]!.value;
+  return defaultActivityColors[activityType] ?? fallbackActivityColor;
 }
 
 function resolveActivityColor(activity: { activityType: ActivityType; activityColor?: string }) {
   return activity.activityColor ?? defaultActivityColor(activity.activityType);
 }
 
+function colorMixSoft(value: string) {
+  return `color-mix(in srgb, ${value} 16%, #ffffff)`;
+}
+
+function colorMixText(value: string) {
+  return `color-mix(in srgb, ${value} 76%, #111111)`;
+}
+
+function findActivityColorOption(value: string) {
+  return (
+    activityColorOptions.find((option) => option.value === value) ??
+    activityColorOptions.find((option) => option.value === fallbackActivityColor) ??
+    activityColorOptions[0]!
+  );
+}
+
 function activityColorMeta(activity: { activityType: ActivityType; activityColor?: string }) {
   const color = resolveActivityColor(activity);
-  return activityColorOptions.find((option) => option.value === color) ?? activityColorOptions[0]!;
+  return findActivityColorOption(color);
 }
 
 function activityColorStyle(activity: { activityType: ActivityType; activityColor?: string }) {
   const color = activityColorMeta(activity);
   return {
     "--activity-color": color.value,
-    "--activity-color-soft": color.soft,
-    "--activity-color-text": color.text,
+    "--activity-color-soft": color.soft ?? colorMixSoft(color.value),
+    "--activity-color-text": color.text ?? colorMixText(color.value),
   } as CSSProperties;
 }
 
@@ -918,27 +1005,54 @@ function ColorPicker({
   value: string;
   onChange: (color: string) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedColor = findActivityColorOption(value);
+
+  const chooseColor = (color: string) => {
+    onChange(color);
+    setIsOpen(false);
+  };
+
   return (
     <fieldset className="color-picker">
       <legend>Colour</legend>
-      <div className="color-grid">
-        {activityColorOptions.map((color) => (
-          <button
-            aria-label={`Use ${color.name}`}
-            className={value === color.value ? "color-swatch selected" : "color-swatch"}
-            key={color.value}
-            onClick={() => onChange(color.value)}
-            style={
-              {
-                "--swatch-color": color.value,
-                "--swatch-soft": color.soft,
-              } as CSSProperties
-            }
-            type="button"
-          >
-            <span />
-          </button>
-        ))}
+      <div className="color-picker-shell">
+        <button
+          aria-expanded={isOpen}
+          aria-label={`Choose colour. Selected ${selectedColor.name}`}
+          className="selected-color-button"
+          onClick={() => setIsOpen((current) => !current)}
+          style={{ "--selected-color": selectedColor.value } as CSSProperties}
+          type="button"
+        >
+          <span className="selected-color-main">
+            <span className="selected-color-swatch" aria-hidden="true" />
+            <span>{selectedColor.name}</span>
+          </span>
+          <ChevronDown size={17} aria-hidden="true" />
+        </button>
+
+        {isOpen ? (
+          <div className="color-palette" role="grid" aria-label="Colour palette">
+            {activityColorOptions.map((color) => {
+              const isSelected = value === color.value;
+              return (
+                <button
+                  aria-label={`Use ${color.name}`}
+                  aria-pressed={isSelected}
+                  className={isSelected ? "palette-swatch selected" : "palette-swatch"}
+                  key={color.value}
+                  onClick={() => chooseColor(color.value)}
+                  style={{ "--palette-color": color.value } as CSSProperties}
+                  title={color.name}
+                  type="button"
+                >
+                  {isSelected ? <Check size={18} aria-hidden="true" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </fieldset>
   );
